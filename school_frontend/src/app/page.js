@@ -7,21 +7,18 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import {
   Card,
-  CardAction,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
 import { ArrowUpIcon, ArrowDownIcon } from "lucide-react";
-import { Field, FieldLabel } from "@/components/ui/field";
+//Imports nuevos
+import { useSearchParams } from 'next/navigation';
+import { PruebaPagination } from "@/components/ui/pruebapagination";
+import { PruebaDialog } from "@/components/ui/pruebadialog";
+import { useRouter } from "next/navigation";
 
 const API_BASE_URL = "http://localhost:8000";
-
-
-
-
 
 export default function Home() {
   const {
@@ -33,10 +30,19 @@ export default function Home() {
   const [students, setStudents] = useState([]);
   const [query, setQuery] = useState("");
   const [ordering, setOrdering] = useState("full_name")
+  const [totalCount, setTotalCount] = useState(0);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  //Obtenemos el número de página del frontend
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const currentPage = Number(searchParams.get('page')) || 1;
+  const pageSize = 5;
+  const totalPages = Math.ceil(totalCount / pageSize);
 
   const loadStudents = async () => {
     console.log("Haciendo búsqueda de... ", query)
-    const url = `${API_BASE_URL}/students/?search=${query}&ordering=${ordering}`
+    const url = `${API_BASE_URL}/students/?search=${query}&ordering=${ordering}&page=${currentPage}`
     const res = await fetch(url);
     const data = await res.json();
     return data;
@@ -54,9 +60,10 @@ export default function Home() {
 
   useEffect(() => {
     loadStudents().then((data) => {
-      setStudents(data);
+      setStudents(data.results);
+      setTotalCount(data.count);
     });
-  }, [query, ordering]);
+  }, [query, ordering, currentPage]);
 
   const onSubmit = async (data) => {
     console.log("Submitting data: ", data);
@@ -71,11 +78,12 @@ export default function Home() {
     if (response.ok) {
       const newStudent = await response.json();
       loadStudents().then((data) => {
-      setStudents(data);
-    });
+        setStudents(data.results);
+        setTotalCount(data.count);
+      });
       // setStudents([newStudent,...students]);
       toast.success("Estudiante agregado con éxito");
-
+      setDialogOpen(false);
     }
     else {
       const errorData = await response.json();
@@ -83,7 +91,7 @@ export default function Home() {
 
       let errorMessage = "";
 
-      for(const key in errorData) {
+      for (const key in errorData) {
         errorMessage += `${key}: ${errorData[key]}\n`;
       }
 
@@ -93,8 +101,12 @@ export default function Home() {
     }
   }
 
+  function regresar(){
+    router.push(`/students/`);
+  }
+
   return (
-    <Card className="w-96 mx-auto mt-4">
+    <Card className="w-150 mx-auto mt-4">
       <CardHeader>
         <CardTitle>Students</CardTitle>
       </CardHeader>
@@ -110,7 +122,7 @@ export default function Home() {
         </div>
         <hr className="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700"></hr>
 
-        <div className="p-4 h-96 overflow-y-auto">
+        <div className="p-4 h-60 overflow-y-auto">
           <ul>
             {students.map((student) => (
               <li key={student.code} className="text-md font-medium my-2 flex flex-row justify-between" title={student.email}>
@@ -121,30 +133,26 @@ export default function Home() {
                 <div>
                   {student.code}
                 </div>
+                <div>
+                  <Button variant="outline" onClick={() => router.push(`/students/${student.id}`)}>Detalles
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
         </div>
-        <hr className="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700"></hr>
+        <hr className="h-px mb-2 bg-gray-200 border-0 dark:bg-gray-700"></hr>
 
-        <div>
-          <Field className="mt-4">
-            <FieldLabel htmlFor="full_name" >Nombre completo</FieldLabel>
-            <Input id="full_name" placeholder="Ingresa el nombre" {...register("full_name", { required: true })}></Input>
-          </Field>
-          <Field className="mt-4">
-            <FieldLabel htmlFor="email">Email</FieldLabel>
-            <Input id="email" placeholder="Ingresa el email" {...register("email", { required: true })}></Input>
-          </Field>
-          <Field className="mt-4">
-            <FieldLabel htmlFor="code">Código</FieldLabel>
-            <Input id="code" placeholder="Ingresa el código" {...register("code", { required: true })}></Input>
-          </Field>
-          <Button className="my-2" onClick={handleSubmit(onSubmit)}>
-            Agregar estudiante
-          </Button>
-        </div>
+        <PruebaDialog
+          register={register}
+          handleSubmit={handleSubmit}
+          onSubmit={onSubmit}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+        />
+
       </CardContent>
+      <PruebaPagination currentPage={currentPage} totalPages={totalPages} />
     </Card>
 
   );
